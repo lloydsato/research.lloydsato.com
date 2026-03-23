@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Research Report – Lloyd Sato</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0e0e11;
+      --bg-surface: #16161a;
+      --bg-card: #1c1c22;
+      --text: #e2e0dc;
+      --text-muted: #8a8690;
+      --accent: #c4713b;
+      --accent-light: #e09060;
+      --accent-dim: rgba(196, 113, 59, 0.15);
+      --border: #2a2a32;
+      --border-hover: #3a3a44;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 52px;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      background: rgba(14, 14, 17, 0.95);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-left { display: flex; align-items: center; gap: 14px; }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.8rem;
+      padding: 5px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      transition: all 0.2s;
+    }
+    .back-link:hover { color: var(--text); border-color: var(--border-hover); background: var(--bg-card); }
+    .back-link svg { width: 13px; height: 13px; }
+
+    .report-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 300px;
+    }
+    .report-title span { color: var(--accent); }
+
+    .toolbar { display: flex; align-items: center; gap: 6px; }
+
+    .page-info {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      padding: 0 10px;
+      white-space: nowrap;
+    }
+
+    .tool-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px; height: 32px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tool-btn:hover { color: var(--text); background: var(--bg-card); border-color: var(--border-hover); }
+    .tool-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .tool-btn svg { width: 14px; height: 14px; }
+
+    .divider-v { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+
+    .zoom-select {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      padding: 5px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .zoom-select:hover { border-color: var(--border-hover); color: var(--text); }
+
+    .download-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--accent-dim);
+      background: var(--accent-dim);
+      color: var(--accent-light);
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .download-btn:hover { background: rgba(196, 113, 59, 0.25); border-color: var(--accent); }
+    .download-btn svg { width: 13px; height: 13px; }
+
+    #viewer-wrap {
+      position: fixed;
+      top: 52px; left: 0; right: 0; bottom: 0;
+      overflow-y: auto;
+      overflow-x: auto;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 28px 20px;
+      gap: 16px;
+    }
+
+    .page-wrapper {
+      position: relative;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.5);
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      line-height: 0;
+    }
+
+    canvas { display: block; }
+
+    #loading {
+      position: fixed;
+      top: 52px; left: 0; right: 0; bottom: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      background: var(--bg);
+      z-index: 50;
+    }
+
+    .spinner {
+      width: 32px; height: 32px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+    }
+
+    @media (max-width: 600px) {
+      .report-title { display: none; }
+      .zoom-select { display: none; }
+      .divider-v { display: none; }
+      .download-btn span { display: none; }
+      .download-btn { padding: 6px 10px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-left">
+      <a href="https://www.lloydsato.com" class="back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+        Back
+      </a>
+      <div class="report-title"><span>research/</span> Decoding Malicious Camouflage</div>
+    </div>
+
+    <div class="toolbar">
+      <button class="tool-btn" id="prev-btn" title="Previous page" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+      <span class="page-info" id="page-info">— / —</span>
+      <button class="tool-btn" id="next-btn" title="Next page" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </button>
+
+      <div class="divider-v"></div>
+
+      <select class="zoom-select" id="zoom-select">
+        <option value="0.75">75%</option>
+        <option value="1" selected>100%</option>
+        <option value="1.25">125%</option>
+        <option value="1.5">150%</option>
+        <option value="2">200%</option>
+      </select>
+
+      <div class="divider-v"></div>
+
+      <a href="report.pdf" download class="download-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        <span>Download</span>
+      </a>
+    </div>
+  </header>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text">loading report...</div>
+  </div>
+
+  <div id="viewer-wrap"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    const viewerWrap = document.getElementById('viewer-wrap');
+    const loading    = document.getElementById('loading');
+    const pageInfo   = document.getElementById('page-info');
+    const prevBtn    = document.getElementById('prev-btn');
+    const nextBtn    = document.getElementById('next-btn');
+    const zoomSelect = document.getElementById('zoom-select');
+
+    let pdfDoc = null;
+    let scale  = 1;
+
+    // Fix for striped/line rendering — accounts for retina and high-DPI screens
+    const DPR = window.devicePixelRatio || 1;
+
+    function getMaxWidth() {
+      return Math.min(window.innerWidth - 40, 960);
+    }
+
+    async function renderPage(num) {
+      const page    = await pdfDoc.getPage(num);
+      const baseVP  = page.getViewport({ scale: 1 });
+
+      // Fit page width to container, then apply user zoom
+      const fitScale   = (getMaxWidth() / baseVP.width) * scale;
+      const cssViewport = page.getViewport({ scale: fitScale });
+
+      const canvas = document.createElement('canvas');
+
+      // Physical pixel size = CSS size × DPR (fixes the stripe bug)
+      canvas.width  = Math.floor(cssViewport.width  * DPR);
+      canvas.height = Math.floor(cssViewport.height * DPR);
+
+      // Keep CSS layout size at logical pixels
+      canvas.style.width  = Math.floor(cssViewport.width)  + 'px';
+      canvas.style.height = Math.floor(cssViewport.height) + 'px';
+
+      const ctx = canvas.getContext('2d');
+      ctx.scale(DPR, DPR); // Scale drawing context to match physical pixels
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'page-wrapper';
+      wrapper.id = `page-${num}`;
+      wrapper.style.width  = Math.floor(cssViewport.width)  + 'px';
+      wrapper.style.height = Math.floor(cssViewport.height) + 'px';
+      wrapper.appendChild(canvas);
+      viewerWrap.appendChild(wrapper);
+
+      await page.render({ canvasContext: ctx, viewport: cssViewport }).promise;
+    }
+
+    async function loadAllPages() {
+      viewerWrap.innerHTML = '';
+      for (let i = 1; i <= pdfDoc.numPages; i++) {
+        await renderPage(i);
+      }
+      updateNav();
+    }
+
+    function getCurrentPage() {
+      const pages = viewerWrap.querySelectorAll('.page-wrapper');
+      let current = 1;
+      const mid   = 52 + (window.innerHeight - 52) / 2;
+      for (let i = 0; i < pages.length; i++) {
+        const rect = pages[i].getBoundingClientRect();
+        if (rect.top <= mid) current = i + 1;
+      }
+      return current;
+    }
+
+    function updateNav() {
+      if (!pdfDoc) return;
+      const cur = getCurrentPage();
+      pageInfo.textContent = `${cur} / ${pdfDoc.numPages}`;
+      prevBtn.disabled = cur <= 1;
+      nextBtn.disabled = cur >= pdfDoc.numPages;
+    }
+
+    function scrollToPage(num) {
+      const el = document.getElementById(`page-${num}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    prevBtn.addEventListener('click', () => scrollToPage(getCurrentPage() - 1));
+    nextBtn.addEventListener('click', () => scrollToPage(getCurrentPage() + 1));
+
+    zoomSelect.addEventListener('change', () => {
+      scale = parseFloat(zoomSelect.value);
+      loadAllPages();
+    });
+
+    viewerWrap.addEventListener('scroll', updateNav);
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nextBtn.click();
+      if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   prevBtn.click();
+    });
+
+    pdfjsLib.getDocument('report.pdf').promise.then(pdf => {
+      pdfDoc = pdf;
+      loading.style.display = 'none';
+      prevBtn.disabled = false;
+      nextBtn.disabled = false;
+      loadAllPages();
+    }).catch(err => {
+      loading.innerHTML = `
+        <div style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:#c4713b;text-align:center;padding:20px;">
+          Could not load report.pdf<br>
+          <span style="color:#8a8690;font-size:0.7rem;">Make sure report.pdf is in the same folder as this file.</span>
+        </div>`;
+      console.error(err);
+    });
+  </script>
+
+</body>
+</html>
