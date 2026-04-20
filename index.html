@@ -6,7 +6,7 @@
   <title>Research Report – Lloyd Sato</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #0e0e11;
@@ -31,10 +31,34 @@
       overflow: hidden;
     }
 
+    /* ── STATUS BAR (matches "available for opportunities" pill on main site) ── */
+    .status-bar {
+      position: fixed;
+      top: 0; left: 0; right: 0; height: 28px;
+      z-index: 101;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+    }
+    .status-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.4; }
+    }
+
     /* ── HEADER ── */
     header {
       position: fixed;
-      top: 0; left: 0; right: 0; height: 52px;
+      top: 28px; left: 0; right: 0; height: 52px;
       z-index: 100;
       display: flex; align-items: center; justify-content: space-between;
       padding: 0 20px;
@@ -43,7 +67,24 @@
       border-bottom: 1px solid var(--border);
     }
 
-    .header-left { display: flex; align-items: center; gap: 14px; }
+    .header-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+
+    /* Bracketed brand — matches [lloyd.sato] on the main site */
+    .brand {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--text);
+      text-decoration: none;
+      white-space: nowrap;
+      transition: color 0.2s;
+    }
+    .brand:hover { color: var(--accent); }
+    .brand .bracket { color: var(--text-muted); font-weight: 400; }
+
+    .brand-sep {
+      width: 1px; height: 18px; background: var(--border); flex-shrink: 0;
+    }
 
     .back-link {
       display: inline-flex; align-items: center; gap: 6px;
@@ -56,12 +97,20 @@
     .back-link svg { width: 13px; height: 13px; flex-shrink: 0; }
 
     .report-title {
+      display: flex; align-items: center; gap: 10px;
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.75rem; color: var(--text-muted);
       letter-spacing: 0.5px; white-space: nowrap;
-      overflow: hidden; text-overflow: ellipsis; max-width: 260px;
+      overflow: hidden; text-overflow: ellipsis; max-width: 320px;
     }
-    .report-title span { color: var(--accent); }
+    .report-title .section-num {
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .report-title .section-line {
+      width: 20px; height: 1px; background: var(--border-hover); flex-shrink: 0;
+    }
+    .report-title .path { color: var(--accent); }
 
     /* ── TOOLBAR ── */
     .toolbar { display: flex; align-items: center; gap: 6px; }
@@ -77,7 +126,6 @@
     .tool-btn:disabled { opacity: 0.3; cursor: not-allowed; }
     .tool-btn svg { width: 14px; height: 14px; }
 
-    /* Page jump: "12 / 62" where the number is an input */
     .page-jump {
       display: flex; align-items: center; gap: 5px;
       font-family: 'JetBrains Mono', monospace;
@@ -96,7 +144,6 @@
       text-align: center;
       outline: none;
       transition: border-color 0.2s;
-      /* hide number spinners */
       -moz-appearance: textfield;
     }
     .page-jump input::-webkit-outer-spin-button,
@@ -127,7 +174,7 @@
     /* ── VIEWER ── */
     #viewer-wrap {
       position: fixed;
-      top: 52px; left: 0; right: 0; bottom: 0;
+      top: 80px; left: 0; right: 0; bottom: 32px;
       overflow-y: scroll;
       overflow-x: hidden;
       background: var(--bg);
@@ -148,13 +195,12 @@
       box-shadow: 0 2px 24px rgba(0,0,0,0.55);
       border: 1px solid var(--border);
       border-radius: 3px;
-      /* no extra CSS sizing — JS controls width/height via style */
     }
 
     /* ── LOADING ── */
     #loading {
       position: fixed;
-      top: 52px; left: 0; right: 0; bottom: 0;
+      top: 80px; left: 0; right: 0; bottom: 32px;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
       gap: 14px; background: var(--bg); z-index: 50;
@@ -169,9 +215,30 @@
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.75rem; color: var(--text-muted); letter-spacing: 1px;
     }
+    .loading-text .prompt { color: var(--accent); margin-right: 6px; }
+
+    /* ── FOOTER ── */
+    footer {
+      position: fixed;
+      bottom: 0; left: 0; right: 0; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      z-index: 99;
+    }
+    footer .sep { color: var(--border-hover); margin: 0 8px; }
 
     /* ── RESPONSIVE ── */
+    @media (max-width: 720px) {
+      .report-title .section-line { display: none; }
+      .report-title { max-width: 180px; }
+    }
     @media (max-width: 640px) {
+      .brand-sep   { display: none; }
+      .brand       { display: none; }
       .report-title { display: none; }
       .zoom-select  { display: none; }
       .divider-v    { display: none; }
@@ -182,28 +249,39 @@
 </head>
 <body>
 
+  <!-- Status bar matching the "available for opportunities" pill on lloydsato.com -->
+  <div class="status-bar">
+    <span class="status-dot" aria-hidden="true"></span>
+    <span>available for opportunities</span>
+  </div>
+
   <header>
     <div class="header-left">
+      <a href="https://www.lloydsato.com" class="brand">
+        <span class="bracket">[</span>lloyd.sato<span class="bracket">]</span>
+      </a>
+      <span class="brand-sep" aria-hidden="true"></span>
       <a href="https://www.lloydsato.com" class="back-link">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         Back
       </a>
-      <div class="report-title"><span>research/</span> Decoding Malicious Camouflage</div>
+      <div class="report-title">
+        <span class="section-num">03</span>
+        <span class="section-line" aria-hidden="true"></span>
+        <span><span class="path">research/</span> Decoding Malicious Camouflage</span>
+      </div>
     </div>
 
     <div class="toolbar">
-      <!-- Prev -->
       <button class="tool-btn" id="prev-btn" title="Previous page" disabled>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
 
-      <!-- Page jump input -->
       <div class="page-jump">
         <input type="number" id="page-input" min="1" value="1" title="Jump to page"/>
         <span>/ <span id="total-pages">—</span></span>
       </div>
 
-      <!-- Next -->
       <button class="tool-btn" id="next-btn" title="Next page" disabled>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
@@ -234,10 +312,18 @@
 
   <div id="loading">
     <div class="spinner"></div>
-    <div class="loading-text">loading report...</div>
+    <div class="loading-text">
+      <span class="prompt">lloyd@soc ~ %</span>loading report...
+    </div>
   </div>
 
   <div id="viewer-wrap"></div>
+
+  <footer>
+    <span>Built by Lloyd Sato</span>
+    <span class="sep">·</span>
+    <span>2026</span>
+  </footer>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>
@@ -260,7 +346,6 @@
       return Math.min(window.innerWidth - 32, 960);
     }
 
-    /* Render a single page into a NEW canvas and append to wrap */
     async function renderPage(num) {
       const page     = await pdfDoc.getPage(num);
       const baseVP   = page.getViewport({ scale: 1 });
@@ -283,7 +368,6 @@
       await page.render({ canvasContext: ctx, viewport: vp, intent: 'display' }).promise;
     }
 
-    /* Render ALL pages sequentially */
     async function renderAll() {
       wrap.innerHTML = '';
       for (let i = 1; i <= pdfDoc.numPages; i++) {
@@ -291,13 +375,11 @@
       }
     }
 
-    /* Jump to a page by scrolling its canvas into view */
     function jumpToPage(num) {
       const el = document.getElementById('p' + num);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    /* Work out which page is currently most visible */
     function getVisiblePage() {
       const canvases = wrap.querySelectorAll('.pdf-page');
       let best = 1, bestVis = 0;
@@ -312,7 +394,6 @@
       return best;
     }
 
-    /* Keep toolbar page number in sync while scrolling */
     wrap.addEventListener('scroll', () => {
       const cur = getVisiblePage();
       pageInput.value  = cur;
@@ -320,7 +401,6 @@
       nextBtn.disabled = cur >= (pdfDoc ? pdfDoc.numPages : 1);
     }, { passive: true });
 
-    /* Prev / Next buttons */
     prevBtn.addEventListener('click', () => {
       const cur = getVisiblePage();
       if (cur > 1) jumpToPage(cur - 1);
@@ -330,7 +410,6 @@
       if (pdfDoc && cur < pdfDoc.numPages) jumpToPage(cur + 1);
     });
 
-    /* Type a page number and press Enter to jump */
     pageInput.addEventListener('keydown', e => {
       if (e.key === 'Enter') {
         const val = parseInt(pageInput.value);
@@ -340,26 +419,22 @@
         }
       }
     });
-    /* Also jump on blur (tap away on mobile) */
     pageInput.addEventListener('blur', () => {
       const val = parseInt(pageInput.value);
       if (pdfDoc && val >= 1 && val <= pdfDoc.numPages) jumpToPage(val);
     });
 
-    /* Zoom — re-render everything */
     zoomSelect.addEventListener('change', () => {
       scale = parseFloat(zoomSelect.value);
       renderAll();
     });
 
-    /* Keyboard shortcuts */
     document.addEventListener('keydown', e => {
       if (document.activeElement === pageInput) return;
       if (e.key === 'ArrowDown'  || e.key === 'ArrowRight') nextBtn.click();
       if (e.key === 'ArrowUp'    || e.key === 'ArrowLeft')  prevBtn.click();
     });
 
-    /* Load PDF */
     pdfjsLib.getDocument('report.pdf').promise.then(async pdf => {
       pdfDoc = pdf;
       totalEl.textContent  = pdf.numPages;
@@ -372,7 +447,8 @@
       loading.innerHTML = `
         <div style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;
                     color:#c4713b;text-align:center;padding:20px;line-height:1.8;">
-          Could not load report.pdf<br>
+          <span style="color:#c4713b;">lloyd@soc ~ %</span> cat report.pdf<br>
+          <span style="color:#e09060;">Could not load report.pdf</span><br>
           <span style="color:#8a8690;font-size:0.7rem;">
             Make sure report.pdf is in the same folder as this file.
           </span>
