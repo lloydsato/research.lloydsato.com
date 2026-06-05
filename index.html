@@ -72,8 +72,13 @@
       font-family: var(--font-mono);
       font-feature-settings: "ss01", "cv11";
       -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
       overflow: hidden;
     }
+
+    /* kill the 300ms tap delay + double-tap zoom on chrome controls
+       (the viewer itself is left untouched so native pinch-zoom keeps working) */
+    header, footer, #panel, #findbar, #help, #scrim { touch-action: manipulation; }
 
     ::selection { background: var(--accent-soft); }
 
@@ -115,7 +120,8 @@
       position: fixed; top: var(--progress-h); left: 0; right: 0; height: var(--bar-h);
       z-index: 100;
       display: flex; align-items: center; justify-content: space-between;
-      gap: 14px; padding: 0 16px;
+      gap: 14px;
+      padding: 0 calc(16px + env(safe-area-inset-right, 0px)) 0 calc(16px + env(safe-area-inset-left, 0px));
       background: var(--bg-nav);
       backdrop-filter: blur(16px) saturate(135%);
       -webkit-backdrop-filter: blur(16px) saturate(135%);
@@ -251,7 +257,8 @@
        Side panel — contents / thumbnails
        ============================================================ */
     #panel {
-      position: fixed; top: calc(var(--progress-h) + var(--bar-h)); bottom: var(--foot-h);
+      position: fixed; top: calc(var(--progress-h) + var(--bar-h));
+      bottom: calc(var(--foot-h) + env(safe-area-inset-bottom, 0px));
       left: 0; width: 248px; z-index: 90;
       background: oklch(0.20 0.028 252 / 0.96);
       backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
@@ -296,14 +303,25 @@
     .panel-empty { font-size: 11.5px; color: var(--fg-muted); text-align: center; padding: 28px 14px; line-height: 1.7; }
 
     /* ============================================================
+       Scrim — dims content behind the side panel on small screens
+       ============================================================ */
+    #scrim {
+      position: fixed; inset: 0; z-index: 85; display: none;
+      background: oklch(0.12 0.02 255 / 0.5);
+      backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+      opacity: 0; pointer-events: none; transition: opacity 0.25s;
+    }
+    #scrim.open { opacity: 1; pointer-events: auto; }
+
+    /* ============================================================
        Viewer
        ============================================================ */
     #viewer-wrap {
-      position: fixed; inset: 0; bottom: var(--foot-h);
+      position: fixed; inset: 0; bottom: calc(var(--foot-h) + env(safe-area-inset-bottom, 0px));
       overflow-y: auto; overflow-x: hidden;
       display: flex; flex-direction: column; align-items: center;
       gap: 16px; scroll-behavior: smooth;
-      padding: calc(var(--progress-h) + var(--bar-h) + 22px) 16px calc(22px);
+      padding: calc(var(--progress-h) + var(--bar-h) + 22px) calc(16px + env(safe-area-inset-right, 0px)) 22px calc(16px + env(safe-area-inset-left, 0px));
       scroll-padding-top: calc(var(--progress-h) + var(--bar-h) + 16px);
     }
     body.immersive #viewer-wrap { bottom: 0; padding-top: 20px; scroll-padding-top: 16px; }
@@ -342,7 +360,7 @@
        Loading
        ============================================================ */
     #loading {
-      position: fixed; inset: 0; bottom: var(--foot-h);
+      position: fixed; inset: 0; bottom: calc(var(--foot-h) + env(safe-area-inset-bottom, 0px));
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       gap: 16px; background: var(--bg-0); z-index: 80;
       transition: opacity 0.4s; padding-top: var(--bar-h);
@@ -357,9 +375,11 @@
        Footer
        ============================================================ */
     footer {
-      position: fixed; bottom: 0; left: 0; right: 0; height: var(--foot-h); z-index: 99;
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 99;
+      height: calc(var(--foot-h) + env(safe-area-inset-bottom, 0px));
       display: flex; align-items: center; justify-content: space-between;
-      gap: 12px; padding: 0 16px;
+      gap: 12px;
+      padding: 0 calc(16px + env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) calc(16px + env(safe-area-inset-left, 0px));
       background: var(--bg-nav);
       backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
       border-top: 1px solid var(--border);
@@ -388,7 +408,8 @@
     }
     #help.open { opacity: 1; pointer-events: auto; }
     .help-card {
-      width: min(460px, 100%); background: var(--bg-card-solid);
+      width: min(460px, 100%); max-height: 85vh; overflow-y: auto;
+      background: var(--bg-card-solid);
       border: 1px solid var(--border-strong); border-radius: var(--radius-lg);
       box-shadow: 0 30px 80px -20px oklch(0 0 0 / 0.8);
       transform: translateY(8px) scale(0.98); transition: transform 0.2s;
@@ -406,27 +427,51 @@
     }
 
     /* ============================================================
-       Responsive
+       Responsive — controls drop out progressively so the toolbar
+       (and the Download CTA at its right edge) never overflow.
+       The left cluster truncates via ellipsis; only the toolbar,
+       whose buttons don't shrink, is width-budgeted here.
        ============================================================ */
-    @media (max-width: 1180px) { .opt-hide { display: none !important; } }
-    @media (max-width: 980px)  { .crumb .ttl { max-width: 200px; } }
+    @media (max-width: 1180px) { .opt-hide { display: none !important; } }          /* print + open-in-new-tab */
+    @media (max-width: 1024px) { .zoom-fit { display: none !important; } }          /* fit-width / fit-page toggles */
+    @media (max-width: 980px)  { .crumb .ttl { max-width: 180px; } }
     @media (max-width: 860px)  {
       .crumb .tick, .crumb .ttl { display: none; }
       .back-link span { display: none; }
       .back-link { padding: 6px 8px; }
+      .download-btn span { display: none; }
+      .download-btn { padding: 7px 10px; }
     }
     @media (max-width: 720px) {
       .crumb { display: none; }
-      .zoom-fit { display: none !important; }
       .help-body { grid-template-columns: 1fr; }
+      #scrim.open { display: block; }                                              /* tap-outside-to-close panel */
+    }
+    @media (max-width: 700px) {
+      .logo .l-dim, .logo .l-accent { display: none; }                             /* brand → bare dot */
+      .sep { display: none; }
+      .divider { display: none; }
+    }
+    @media (max-width: 640px) {
+      .g-zoom { display: none; }                                                   /* manual zoom → native pinch */
     }
     @media (max-width: 560px) {
-      .logo .l-dim, .logo .l-accent { display: none; }
-      .sep { display: none; }
-      .download-btn span { display: none; }
-      .download-btn { padding: 7px 10px; }
-      #findbar input { width: 150px; }
       :root { --bar-h: 50px; }
+      header { gap: 8px; padding: 0 calc(10px + env(safe-area-inset-right, 0px)) 0 calc(10px + env(safe-area-inset-left, 0px)); }
+      .toolbar, .group { gap: 2px; }
+      /* find bar spans the width instead of a fixed 200px box hanging off the right */
+      #findbar { left: 8px; right: 8px; margin-top: 6px; }
+      #findbar input { width: auto; flex: 1 1 auto; min-width: 0; font-size: 16px; } /* 16px stops iOS focus-zoom */
+      #page-input { width: 46px; font-size: 16px; }
+      #panel { width: min(300px, 86vw); }
+      #viewer-wrap { padding-left: calc(10px + env(safe-area-inset-left, 0px)); padding-right: calc(10px + env(safe-area-inset-right, 0px)); }
+      /* footer keeps only the right cluster so it can't wrap or overflow */
+      .foot-status { display: none; }
+      footer { justify-content: flex-end; }
+    }
+    @media (max-width: 380px) {
+      .back-link { display: none; }                                               /* logo dot still links home */
+      .pj-total { display: none; }                                                /* hide “/ N”; input still shows page */
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -468,7 +513,7 @@
         </button>
         <div class="page-jump">
           <input type="number" id="page-input" min="1" value="1" title="Jump to page (g)" aria-label="Current page"/>
-          <span>/&nbsp;<span id="total-pages">—</span></span>
+          <span class="pj-total">/&nbsp;<span id="total-pages">—</span></span>
         </div>
         <button class="tbtn" id="next-btn" title="Next page (j / ↓)" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -477,7 +522,7 @@
 
       <div class="divider"></div>
 
-      <div class="group">
+      <div class="group g-zoom">
         <button class="tbtn" id="zoom-out" title="Zoom out (−)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
@@ -547,6 +592,8 @@
     <div class="panel-body" id="panel-thumbs"><div class="thumbs" id="thumbs"></div></div>
     <div class="panel-body" id="panel-outline" style="display:none"><div class="outline" id="outline"></div></div>
   </aside>
+
+  <div id="scrim" aria-hidden="true"></div>
 
   <div id="loading">
     <div class="spinner"></div>
@@ -622,7 +669,6 @@
     /* ── state ── */
     const DPR = Math.min(window.devicePixelRatio || 1, 2);
     const MAXW = 1120;
-    const PAD  = 32;                 // horizontal breathing room around a page
     let pdfDoc = null;
     let zoomMode = 'width';          // 'width' | 'page'
     let zoomFactor = 1;              // multiplier on top of the fit base
@@ -634,7 +680,9 @@
        Rendering
        ============================================================ */
     function fitBaseWidth () {
-      return Math.min(wrap.clientWidth - PAD, MAXW);
+      const cs = getComputedStyle(wrap);
+      const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+      return Math.min(wrap.clientWidth - padX, MAXW);
     }
 
     function computeScale (base) {
@@ -826,11 +874,13 @@
 
     /* debounced re-fit on resize */
     let resizeT;
-    window.addEventListener('resize', () => {
+    function scheduleReflow (delay) {
       if (!pdfDoc) return;
       clearTimeout(resizeT);
-      resizeT = setTimeout(() => renderAll(currentPage()), 160);
-    });
+      resizeT = setTimeout(() => renderAll(currentPage()), delay);
+    }
+    window.addEventListener('resize', () => scheduleReflow(160));
+    window.addEventListener('orientationchange', () => scheduleReflow(260));
 
     /* ============================================================
        Find in document
@@ -935,15 +985,18 @@
        Side panel — thumbnails + outline
        ============================================================ */
     const panel = $('panel');
+    const scrim = $('scrim');
     let thumbsBuilt = false;
 
     function togglePanel (force) {
       const open = force === undefined ? !panel.classList.contains('open') : force;
       panel.classList.toggle('open', open);
+      scrim.classList.toggle('open', open);
       $('panel-btn').classList.toggle('active', open);
       if (open && !thumbsBuilt) buildThumbs();
     }
     $('panel-btn').addEventListener('click', () => togglePanel());
+    scrim.addEventListener('click', () => togglePanel(false));
 
     document.querySelectorAll('.panel-tab').forEach(tab => {
       tab.addEventListener('click', () => {
