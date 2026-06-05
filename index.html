@@ -2,459 +2,1127 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Research Report – Lloyd Sato</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>Decoding Malicious Camouflage · Research — Lloyd Sato</title>
+  <meta name="description" content="Decoding Malicious Camouflage: Analysing Evasion Techniques — Master's research by Lloyd Sato on how modern malware circumvents AMSI and EDR. Read the full report." />
+  <meta name="author" content="Lloyd Sato" />
+  <meta name="theme-color" content="#1b1f2b" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="lloyd.sato" />
+  <meta property="og:title" content="Decoding Malicious Camouflage: Analysing Evasion Techniques" />
+  <meta property="og:description" content="Master's research on how contemporary malware families circumvent host-based defences — specifically AMSI and EDR." />
+  <meta property="og:url" content="https://research.lloydsato.com" />
+
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='7' fill='%23e0a458'/%3E%3C/svg%3E" />
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
   <style>
+    /* ============================================================
+       Palette + tokens — mirrors lloydsato.com exactly
+       ============================================================ */
     :root {
-      --bg: #0e0e11;
-      --bg-card: #1c1c22;
-      --text: #e2e0dc;
-      --text-muted: #8a8690;
-      --accent: #c4713b;
-      --accent-light: #e09060;
-      --accent-dim: rgba(196, 113, 59, 0.15);
-      --border: #2a2a32;
-      --border-hover: #3a3a44;
+      --accent:       oklch(0.74 0.10 65);            /* warm amber  */
+      --accent-dim:   oklch(0.62 0.09 60);
+      --accent-soft:  oklch(0.74 0.10 65 / 0.16);
+      --accent-glow:  oklch(0.78 0.12 65 / 0.45);
+      --accent-2:     oklch(0.78 0.14 155);           /* signal green */
+
+      --bg-0:         oklch(0.18 0.028 255);          /* deepest slate */
+      --bg-1:         oklch(0.26 0.035 252);          /* indigo-slate  */
+      --bg-2:         oklch(0.32 0.04 250);
+      --bg-card:      oklch(0.27 0.035 250 / 0.65);
+      --bg-card-solid:oklch(0.27 0.035 250);
+      --bg-nav:       oklch(0.20 0.028 252 / 0.78);
+
+      --border:       oklch(0.40 0.04 250 / 0.6);
+      --border-strong:oklch(0.48 0.045 250);
+
+      --fg:           oklch(0.94 0.018 75);           /* warm cream */
+      --fg-dim:       oklch(0.85 0.028 240);          /* soft sky   */
+      --fg-muted:     oklch(0.66 0.035 250);
+
+      --font-mono: "JetBrains Mono", ui-monospace, "Geist Mono", monospace;
+
+      --radius-sm: 6px;
+      --radius:    10px;
+      --radius-lg: 16px;
+
+      --maxw-page: 1120px;
+
+      --bar-h:      54px;
+      --progress-h: 3px;
+      --foot-h:     30px;
+
+      --shadow-page: 0 10px 40px -12px oklch(0 0 0 / 0.7);
+
+      color-scheme: dark;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     html, body {
       height: 100%;
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg-0);
+      color: var(--fg);
+      font-family: var(--font-mono);
+      font-feature-settings: "ss01", "cv11";
       -webkit-font-smoothing: antialiased;
       overflow: hidden;
     }
 
-    /* ── STATUS BAR (matches "available for opportunities" pill on main site) ── */
-    .status-bar {
-      position: fixed;
-      top: 0; left: 0; right: 0; height: 28px;
-      z-index: 101;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      background: var(--bg);
-      border-bottom: 1px solid var(--border);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.68rem;
-      color: var(--text-muted);
-      letter-spacing: 0.5px;
+    ::selection { background: var(--accent-soft); }
+
+    /* ============================================================
+       Background texture — grid + glow, matches main site
+       ============================================================ */
+    .bg-layer { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+    .bg-grid {
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 60px 60px;
+      opacity: 0.18;
+      mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 10%, transparent 75%);
+      -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 10%, transparent 75%);
     }
-    .status-dot {
-      width: 6px; height: 6px; border-radius: 50%;
-      background: var(--accent);
-      box-shadow: 0 0 8px var(--accent);
-      animation: pulse 2s ease-in-out infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50%      { opacity: 0.4; }
+    .bg-glow {
+      background:
+        radial-gradient(ellipse 55% 38% at 50% -4%, var(--accent-soft) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 30% at 85% 8%, var(--accent-soft) 0%, transparent 60%);
+      opacity: 0.85;
     }
 
-    /* ── HEADER ── */
+    /* ============================================================
+       Reading-progress bar
+       ============================================================ */
+    #progress {
+      position: fixed; top: 0; left: 0; height: var(--progress-h);
+      width: 0%; z-index: 120;
+      background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+      box-shadow: 0 0 10px var(--accent-glow);
+      transition: width 0.08s linear;
+    }
+
+    /* ============================================================
+       Top bar
+       ============================================================ */
     header {
-      position: fixed;
-      top: 28px; left: 0; right: 0; height: 52px;
+      position: fixed; top: var(--progress-h); left: 0; right: 0; height: var(--bar-h);
       z-index: 100;
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0 20px;
-      background: rgba(14,14,17,0.97);
-      backdrop-filter: blur(16px);
+      gap: 14px; padding: 0 16px;
+      background: var(--bg-nav);
+      backdrop-filter: blur(16px) saturate(135%);
+      -webkit-backdrop-filter: blur(16px) saturate(135%);
       border-bottom: 1px solid var(--border);
+      transition: transform 0.32s cubic-bezier(.2,.8,.2,1);
+    }
+    header.hidden { transform: translateY(calc(-100% - var(--progress-h) - 4px)); }
+
+    .bar-left  { display: flex; align-items: center; gap: 12px; min-width: 0; }
+
+    /* logo — pulsing dot + lloyd.sato, exactly like the main nav */
+    .logo {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 13px; text-decoration: none; color: var(--fg);
+      letter-spacing: -0.01em; white-space: nowrap; flex-shrink: 0;
+    }
+    .logo .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--accent); box-shadow: 0 0 10px var(--accent-glow);
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+    .logo .l-accent { color: var(--accent); }
+    .logo .l-dim    { color: var(--fg-dim); }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.6; transform: scale(0.85); }
     }
 
-    .header-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
-
-    /* Bracketed brand — matches [lloyd.sato] on the main site */
-    .brand {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.82rem;
-      font-weight: 500;
-      color: var(--text);
-      text-decoration: none;
-      white-space: nowrap;
-      transition: color 0.2s;
-    }
-    .brand:hover { color: var(--accent); }
-    .brand .bracket { color: var(--text-muted); font-weight: 400; }
-
-    .brand-sep {
-      width: 1px; height: 18px; background: var(--border); flex-shrink: 0;
-    }
+    .sep { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
 
     .back-link {
       display: inline-flex; align-items: center; gap: 6px;
-      color: var(--text-muted); text-decoration: none;
-      font-size: 0.8rem; padding: 5px 10px;
-      border-radius: 6px; border: 1px solid var(--border);
-      transition: all 0.2s; white-space: nowrap;
+      color: var(--fg-dim); text-decoration: none;
+      font-size: 12px; padding: 6px 10px;
+      border-radius: var(--radius-sm); border: 1px solid var(--border);
+      transition: all 0.2s; white-space: nowrap; flex-shrink: 0;
     }
-    .back-link:hover { color: var(--text); border-color: var(--border-hover); background: var(--bg-card); }
-    .back-link svg { width: 13px; height: 13px; flex-shrink: 0; }
+    .back-link:hover { color: var(--fg); border-color: var(--border-strong); background: var(--bg-1); }
+    .back-link svg { width: 13px; height: 13px; }
 
-    .report-title {
-      display: flex; align-items: center; gap: 10px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem; color: var(--text-muted);
-      letter-spacing: 0.5px; white-space: nowrap;
-      overflow: hidden; text-overflow: ellipsis; max-width: 320px;
+    .crumb {
+      display: flex; align-items: center; gap: 9px;
+      font-size: 12px; color: var(--fg-muted);
+      letter-spacing: 0.02em; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis; min-width: 0;
     }
-    .report-title .section-num {
-      color: var(--accent);
-      font-weight: 600;
-    }
-    .report-title .section-line {
-      width: 20px; height: 1px; background: var(--border-hover); flex-shrink: 0;
-    }
-    .report-title .path { color: var(--accent); }
+    .crumb .num  { color: var(--accent); font-weight: 600; }
+    .crumb .slash{ color: var(--accent-dim); }
+    .crumb .ttl  { color: var(--fg-dim); overflow: hidden; text-overflow: ellipsis; }
+    .crumb .tick { width: 16px; height: 1px; background: var(--border-strong); flex-shrink: 0; }
 
-    /* ── TOOLBAR ── */
-    .toolbar { display: flex; align-items: center; gap: 6px; }
+    /* ── toolbar ── */
+    .toolbar { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+    .group   { display: flex; align-items: center; gap: 4px; }
 
-    .tool-btn {
+    .tbtn {
       display: inline-flex; align-items: center; justify-content: center;
-      width: 32px; height: 32px; border-radius: 6px;
-      border: 1px solid var(--border); background: transparent;
-      color: var(--text-muted); cursor: pointer; transition: all 0.2s;
-      flex-shrink: 0;
+      width: 32px; height: 32px; border-radius: var(--radius-sm);
+      border: 1px solid transparent; background: transparent;
+      color: var(--fg-muted); cursor: pointer; transition: all 0.16s;
+      flex-shrink: 0; position: relative;
     }
-    .tool-btn:hover { color: var(--text); background: var(--bg-card); border-color: var(--border-hover); }
-    .tool-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-    .tool-btn svg { width: 14px; height: 14px; }
+    .tbtn:hover { color: var(--fg); background: var(--bg-1); border-color: var(--border); }
+    .tbtn:disabled { opacity: 0.32; cursor: not-allowed; background: transparent; border-color: transparent; }
+    .tbtn.active { color: var(--accent); background: var(--accent-soft); border-color: oklch(0.74 0.10 65 / 0.3); }
+    .tbtn svg { width: 15px; height: 15px; }
+
+    .divider { width: 1px; height: 22px; background: var(--border); margin: 0 4px; flex-shrink: 0; }
 
     .page-jump {
-      display: flex; align-items: center; gap: 5px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.72rem; color: var(--text-muted);
-      white-space: nowrap;
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--fg-muted); white-space: nowrap;
     }
-
     .page-jump input {
-      width: 40px; height: 28px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 5px;
-      color: var(--text);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.72rem;
-      text-align: center;
-      outline: none;
-      transition: border-color 0.2s;
-      -moz-appearance: textfield;
+      width: 38px; height: 30px;
+      background: var(--bg-0); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--fg);
+      font-family: var(--font-mono); font-size: 12px; text-align: center;
+      outline: none; transition: border-color 0.2s; -moz-appearance: textfield;
     }
     .page-jump input::-webkit-outer-spin-button,
-    .page-jump input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .page-jump input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     .page-jump input:focus { border-color: var(--accent); }
 
-    .divider-v { width: 1px; height: 20px; background: var(--border); margin: 0 2px; flex-shrink: 0; }
-
-    .zoom-select {
-      background: var(--bg-card); border: 1px solid var(--border);
-      color: var(--text-muted); font-family: 'JetBrains Mono', monospace;
-      font-size: 0.72rem; padding: 5px 8px; border-radius: 6px;
-      cursor: pointer; outline: none; transition: all 0.2s;
+    .zoom-label {
+      min-width: 44px; height: 30px; padding: 0 6px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 12px; color: var(--fg-dim); cursor: pointer;
+      border: 1px solid transparent; border-radius: var(--radius-sm);
+      background: transparent; font-family: var(--font-mono); transition: all 0.16s;
     }
-    .zoom-select:hover { border-color: var(--border-hover); color: var(--text); }
+    .zoom-label:hover { background: var(--bg-1); border-color: var(--border); color: var(--fg); }
 
     .download-btn {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 6px 14px; border-radius: 6px;
-      border: 1px solid var(--accent-dim); background: var(--accent-dim);
-      color: var(--accent-light); font-size: 0.78rem; font-weight: 500;
-      cursor: pointer; text-decoration: none; transition: all 0.2s;
-      white-space: nowrap;
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 7px 13px; border-radius: var(--radius-sm);
+      border: 1px solid transparent; background: var(--accent);
+      color: var(--bg-0); font-size: 12.5px; font-weight: 600;
+      cursor: pointer; text-decoration: none; transition: all 0.2s cubic-bezier(.2,.8,.2,1);
+      white-space: nowrap; flex-shrink: 0;
+      box-shadow: 0 1px 0 oklch(1 0 0 / 0.25) inset, 0 8px 22px -10px var(--accent-glow);
     }
-    .download-btn:hover { background: rgba(196,113,59,0.25); border-color: var(--accent); }
-    .download-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
+    .download-btn:hover { transform: translateY(-1px); box-shadow: 0 1px 0 oklch(1 0 0 / 0.25) inset, 0 12px 28px -10px var(--accent-glow); }
+    .download-btn svg { width: 14px; height: 14px; }
 
-    /* ── VIEWER ── */
-    #viewer-wrap {
-      position: fixed;
-      top: 80px; left: 0; right: 0; bottom: 32px;
-      overflow-y: scroll;
-      overflow-x: hidden;
-      background: var(--bg);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 24px 16px 40px;
-      gap: 12px;
+    /* ============================================================
+       Find bar
+       ============================================================ */
+    #findbar {
+      position: fixed; top: calc(var(--progress-h) + var(--bar-h)); right: 16px;
+      z-index: 95;
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px; margin-top: 8px;
+      background: var(--bg-card-solid);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      box-shadow: 0 16px 40px -16px oklch(0 0 0 / 0.8);
+      transform: translateY(-14px); opacity: 0; pointer-events: none;
+      transition: opacity 0.2s, transform 0.2s;
     }
-
-    #viewer-wrap::-webkit-scrollbar { width: 6px; }
-    #viewer-wrap::-webkit-scrollbar-track { background: transparent; }
-    #viewer-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-    #viewer-wrap::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
-
-    .pdf-page {
-      display: block;
-      box-shadow: 0 2px 24px rgba(0,0,0,0.55);
-      border: 1px solid var(--border);
-      border-radius: 3px;
+    #findbar.open { transform: translateY(0); opacity: 1; pointer-events: auto; }
+    #findbar input {
+      width: 200px; height: 30px; padding: 0 10px;
+      background: var(--bg-0); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--fg);
+      font-family: var(--font-mono); font-size: 12.5px; outline: none;
+      transition: border-color 0.2s;
     }
+    #findbar input:focus { border-color: var(--accent); }
+    #find-count { font-size: 11.5px; color: var(--fg-muted); min-width: 56px; text-align: center; white-space: nowrap; }
 
-    /* ── LOADING ── */
-    #loading {
-      position: fixed;
-      top: 80px; left: 0; right: 0; bottom: 32px;
+    /* ============================================================
+       Side panel — contents / thumbnails
+       ============================================================ */
+    #panel {
+      position: fixed; top: calc(var(--progress-h) + var(--bar-h)); bottom: var(--foot-h);
+      left: 0; width: 248px; z-index: 90;
+      background: oklch(0.20 0.028 252 / 0.96);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      border-right: 1px solid var(--border);
+      transform: translateX(-100%); transition: transform 0.3s cubic-bezier(.2,.8,.2,1);
       display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      gap: 14px; background: var(--bg); z-index: 50;
     }
-    .spinner {
-      width: 32px; height: 32px;
-      border: 2px solid var(--border); border-top-color: var(--accent);
-      border-radius: 50%; animation: spin 0.8s linear infinite;
+    #panel.open { transform: translateX(0); }
+    body.immersive #panel { top: 0; bottom: 0; }
+
+    .panel-tabs { display: flex; gap: 2px; padding: 10px 10px 8px; border-bottom: 1px solid var(--border); }
+    .panel-tab {
+      flex: 1; padding: 7px 8px; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
+      color: var(--fg-muted); background: transparent; border: 1px solid transparent;
+      border-radius: var(--radius-sm); cursor: pointer; transition: all 0.16s; font-family: var(--font-mono);
     }
+    .panel-tab:hover { color: var(--fg); background: var(--bg-1); }
+    .panel-tab.active { color: var(--accent); background: var(--accent-soft); border-color: oklch(0.74 0.10 65 / 0.3); }
+    .panel-body { flex: 1; overflow-y: auto; padding: 12px; }
+    .panel-body::-webkit-scrollbar { width: 7px; }
+    .panel-body::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+
+    /* thumbnails */
+    .thumbs { display: flex; flex-direction: column; gap: 12px; }
+    .thumb { cursor: pointer; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--border); transition: border-color 0.16s; background: var(--bg-0); }
+    .thumb:hover { border-color: var(--border-strong); }
+    .thumb.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .thumb canvas { display: block; width: 100%; height: auto; }
+    .thumb .cap { display: block; text-align: center; font-size: 10.5px; color: var(--fg-muted); padding: 4px 0; }
+    .thumb.active .cap { color: var(--accent); }
+
+    /* outline */
+    .outline { display: flex; flex-direction: column; gap: 1px; }
+    .outline a {
+      display: block; padding: 7px 10px; font-size: 12px; line-height: 1.4;
+      color: var(--fg-dim); text-decoration: none; border-radius: var(--radius-sm);
+      border-left: 2px solid transparent; transition: all 0.16s;
+    }
+    .outline a:hover { color: var(--fg); background: var(--bg-1); border-left-color: var(--accent); }
+    .outline .lvl-1 { padding-left: 22px; font-size: 11.5px; color: var(--fg-muted); }
+    .outline .lvl-2 { padding-left: 34px; font-size: 11px; color: var(--fg-muted); }
+    .panel-empty { font-size: 11.5px; color: var(--fg-muted); text-align: center; padding: 28px 14px; line-height: 1.7; }
+
+    /* ============================================================
+       Viewer
+       ============================================================ */
+    #viewer-wrap {
+      position: fixed; inset: 0; bottom: var(--foot-h);
+      overflow-y: auto; overflow-x: hidden;
+      display: flex; flex-direction: column; align-items: center;
+      gap: 16px; scroll-behavior: smooth;
+      padding: calc(var(--progress-h) + var(--bar-h) + 22px) 16px calc(22px);
+      scroll-padding-top: calc(var(--progress-h) + var(--bar-h) + 16px);
+    }
+    body.immersive #viewer-wrap { bottom: 0; padding-top: 20px; scroll-padding-top: 16px; }
+
+    #viewer-wrap::-webkit-scrollbar { width: 10px; }
+    #viewer-wrap::-webkit-scrollbar-track { background: transparent; }
+    #viewer-wrap::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
+    #viewer-wrap::-webkit-scrollbar-thumb:hover { background: var(--fg-muted); background-clip: padding-box; }
+
+    .page-container {
+      position: relative; flex-shrink: 0;
+      box-shadow: var(--shadow-page);
+      border-radius: 4px; overflow: hidden;
+      background: #fff;
+      transition: outline-color 0.4s;
+      outline: 0 solid transparent;
+    }
+    .pdf-canvas { display: block; }
+
+    /* selectable / searchable text overlay */
+    .textLayer {
+      position: absolute; inset: 0; overflow: hidden;
+      line-height: 1; text-size-adjust: none; -webkit-text-size-adjust: none;
+      forced-color-adjust: none; transform-origin: 0 0; z-index: 2; opacity: 1;
+    }
+    .textLayer span, .textLayer br {
+      color: transparent; position: absolute; white-space: pre;
+      cursor: text; transform-origin: 0% 0%;
+    }
+    .textLayer span.markedContent { top: 0; height: 0; }
+    .textLayer ::selection { background: oklch(0.74 0.10 65 / 0.4); }
+    mark.hl { background: oklch(0.78 0.14 155 / 0.40); color: transparent; border-radius: 2px; }
+    mark.hl.active { background: oklch(0.74 0.10 65 / 0.55); box-shadow: 0 0 0 2px var(--accent); border-radius: 2px; }
+
+    /* ============================================================
+       Loading
+       ============================================================ */
+    #loading {
+      position: fixed; inset: 0; bottom: var(--foot-h);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; background: var(--bg-0); z-index: 80;
+      transition: opacity 0.4s; padding-top: var(--bar-h);
+    }
+    #loading.gone { opacity: 0; pointer-events: none; }
+    .spinner { width: 30px; height: 30px; border: 2px solid var(--border-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .loading-text {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem; color: var(--text-muted); letter-spacing: 1px;
-    }
-    .loading-text .prompt { color: var(--accent); margin-right: 6px; }
+    .loading-text { font-size: 12.5px; color: var(--fg-muted); letter-spacing: 0.5px; }
+    .loading-text .prompt { color: var(--accent); margin-right: 8px; }
 
-    /* ── FOOTER ── */
+    /* ============================================================
+       Footer
+       ============================================================ */
     footer {
-      position: fixed;
-      bottom: 0; left: 0; right: 0; height: 32px;
-      display: flex; align-items: center; justify-content: center;
-      background: var(--bg);
+      position: fixed; bottom: 0; left: 0; right: 0; height: var(--foot-h); z-index: 99;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 0 16px;
+      background: var(--bg-nav);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
       border-top: 1px solid var(--border);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      z-index: 99;
+      font-size: 11px; color: var(--fg-muted); letter-spacing: 0.02em;
+      transition: transform 0.32s cubic-bezier(.2,.8,.2,1);
     }
-    footer .sep { color: var(--border-hover); margin: 0 8px; }
+    body.immersive footer { transform: translateY(100%); }
+    .foot-status { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .foot-status::before {
+      content: ""; width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent-2); box-shadow: 0 0 6px oklch(0.78 0.14 155 / 0.6);
+    }
+    .foot-right { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .foot-right .dim { color: var(--border-strong); }
+    .foot-right a { color: var(--fg-muted); text-decoration: none; transition: color 0.16s; }
+    .foot-right a:hover { color: var(--accent); }
 
-    /* ── RESPONSIVE ── */
-    @media (max-width: 720px) {
-      .report-title .section-line { display: none; }
-      .report-title { max-width: 180px; }
+    /* ============================================================
+       Help overlay
+       ============================================================ */
+    #help {
+      position: fixed; inset: 0; z-index: 200;
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+      background: oklch(0.12 0.02 255 / 0.72); backdrop-filter: blur(4px);
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
     }
-    @media (max-width: 640px) {
-      .brand-sep   { display: none; }
-      .brand       { display: none; }
-      .report-title { display: none; }
-      .zoom-select  { display: none; }
-      .divider-v    { display: none; }
+    #help.open { opacity: 1; pointer-events: auto; }
+    .help-card {
+      width: min(460px, 100%); background: var(--bg-card-solid);
+      border: 1px solid var(--border-strong); border-radius: var(--radius-lg);
+      box-shadow: 0 30px 80px -20px oklch(0 0 0 / 0.8);
+      transform: translateY(8px) scale(0.98); transition: transform 0.2s;
+    }
+    #help.open .help-card { transform: none; }
+    .help-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--border); }
+    .help-head h2 { font-size: 13px; font-weight: 600; color: var(--fg); letter-spacing: 0.02em; }
+    .help-head .num { color: var(--accent); }
+    .help-body { padding: 8px 20px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 20px; }
+    .help-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; font-size: 12px; color: var(--fg-dim); border-bottom: 1px solid oklch(0.40 0.04 250 / 0.25); }
+    kbd {
+      font-family: var(--font-mono); font-size: 10.5px; color: var(--fg);
+      background: var(--bg-0); border: 1px solid var(--border-strong);
+      border-bottom-width: 2px; border-radius: 5px; padding: 2px 6px; white-space: nowrap;
+    }
+
+    /* ============================================================
+       Responsive
+       ============================================================ */
+    @media (max-width: 1180px) { .opt-hide { display: none !important; } }
+    @media (max-width: 980px)  { .crumb .ttl { max-width: 200px; } }
+    @media (max-width: 860px)  {
+      .crumb .tick, .crumb .ttl { display: none; }
+      .back-link span { display: none; }
+      .back-link { padding: 6px 8px; }
+    }
+    @media (max-width: 720px) {
+      .crumb { display: none; }
+      .zoom-fit { display: none !important; }
+      .help-body { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      .logo .l-dim, .logo .l-accent { display: none; }
+      .sep { display: none; }
       .download-btn span { display: none; }
-      .download-btn { padding: 6px 10px; }
+      .download-btn { padding: 7px 10px; }
+      #findbar input { width: 150px; }
+      :root { --bar-h: 50px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.05ms !important; }
+      #viewer-wrap { scroll-behavior: auto; }
     }
   </style>
 </head>
 <body>
 
-  <!-- Status bar matching the "available for opportunities" pill on lloydsato.com -->
-  <div class="status-bar">
-    <span class="status-dot" aria-hidden="true"></span>
-    <span>available for opportunities</span>
-  </div>
+  <div class="bg-layer bg-grid"  aria-hidden="true"></div>
+  <div class="bg-layer bg-glow"  aria-hidden="true"></div>
+
+  <div id="progress" aria-hidden="true"></div>
 
   <header>
-    <div class="header-left">
-      <a href="https://www.lloydsato.com" class="brand">
-        <span class="bracket">[</span>lloyd.sato<span class="bracket">]</span>
+    <div class="bar-left">
+      <a href="https://www.lloydsato.com" class="logo" aria-label="Lloyd Sato — home">
+        <span class="dot" aria-hidden="true"></span>
+        <span><span class="l-accent">lloyd</span><span class="l-dim">.sato</span></span>
       </a>
-      <span class="brand-sep" aria-hidden="true"></span>
-      <a href="https://www.lloydsato.com" class="back-link">
+      <span class="sep" aria-hidden="true"></span>
+      <a href="https://www.lloydsato.com/#research" class="back-link" title="Back to lloydsato.com">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-        Back
+        <span>Back</span>
       </a>
-      <div class="report-title">
-        <span class="section-num">03</span>
-        <span class="section-line" aria-hidden="true"></span>
-        <span><span class="path">research/</span> Decoding Malicious Camouflage</span>
+      <div class="crumb">
+        <span class="num">03</span>
+        <span class="tick" aria-hidden="true"></span>
+        <span class="slash">research/</span>
+        <span class="ttl">Decoding Malicious Camouflage</span>
       </div>
     </div>
 
     <div class="toolbar">
-      <button class="tool-btn" id="prev-btn" title="Previous page" disabled>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-      </button>
-
-      <div class="page-jump">
-        <input type="number" id="page-input" min="1" value="1" title="Jump to page"/>
-        <span>/ <span id="total-pages">—</span></span>
+      <div class="group">
+        <button class="tbtn" id="prev-btn" title="Previous page (k / ↑)" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+        </button>
+        <div class="page-jump">
+          <input type="number" id="page-input" min="1" value="1" title="Jump to page (g)" aria-label="Current page"/>
+          <span>/&nbsp;<span id="total-pages">—</span></span>
+        </div>
+        <button class="tbtn" id="next-btn" title="Next page (j / ↓)" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
       </div>
 
-      <button class="tool-btn" id="next-btn" title="Next page" disabled>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </button>
+      <div class="divider"></div>
 
-      <div class="divider-v"></div>
+      <div class="group">
+        <button class="tbtn" id="zoom-out" title="Zoom out (−)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <button class="zoom-label" id="zoom-label" title="Reset zoom (0)">100%</button>
+        <button class="tbtn" id="zoom-in" title="Zoom in (+)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <button class="tbtn zoom-fit active" id="fit-width" title="Fit width (w)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 7 4 12 8 17"/><polyline points="16 7 20 12 16 17"/><line x1="4" y1="12" x2="20" y2="12"/></svg>
+        </button>
+        <button class="tbtn zoom-fit" id="fit-page" title="Fit page (e)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="1.5"/></svg>
+        </button>
+      </div>
 
-      <select class="zoom-select" id="zoom-select">
-        <option value="0.5">50%</option>
-        <option value="0.75">75%</option>
-        <option value="1" selected>100%</option>
-        <option value="1.25">125%</option>
-        <option value="1.5">150%</option>
-        <option value="2">200%</option>
-      </select>
+      <div class="divider"></div>
 
-      <div class="divider-v"></div>
+      <div class="group">
+        <button class="tbtn" id="search-btn" title="Find in document (/ or Ctrl+F)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </button>
+        <button class="tbtn" id="panel-btn" title="Contents & thumbnails (t)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+        </button>
+        <button class="tbtn opt-hide" id="print-btn" title="Print">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        </button>
+        <a class="tbtn opt-hide" id="newtab-btn" href="report.pdf" target="_blank" rel="noopener" title="Open PDF in new tab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>
+        <button class="tbtn" id="immersive-btn" title="Immersive / fullscreen (f)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+        </button>
+      </div>
+
+      <div class="divider"></div>
 
       <a href="report.pdf" download class="download-btn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="7 10 12 15 17 10"/>
-          <line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         <span>Download</span>
       </a>
     </div>
   </header>
 
+  <!-- Find bar -->
+  <div id="findbar" role="search">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--fg-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-left:4px"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" id="find-input" placeholder="Find in report…" aria-label="Find in document" autocomplete="off" spellcheck="false"/>
+    <span id="find-count">0 / 0</span>
+    <button class="tbtn" id="find-prev" title="Previous match (Shift+Enter)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+    </button>
+    <button class="tbtn" id="find-next" title="Next match (Enter)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+    <button class="tbtn" id="find-close" title="Close (Esc)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+
+  <!-- Side panel -->
+  <aside id="panel" aria-label="Document navigation">
+    <div class="panel-tabs">
+      <button class="panel-tab active" data-tab="thumbs">Pages</button>
+      <button class="panel-tab" data-tab="outline" id="outline-tab" style="display:none">Contents</button>
+    </div>
+    <div class="panel-body" id="panel-thumbs"><div class="thumbs" id="thumbs"></div></div>
+    <div class="panel-body" id="panel-outline" style="display:none"><div class="outline" id="outline"></div></div>
+  </aside>
+
   <div id="loading">
     <div class="spinner"></div>
-    <div class="loading-text">
-      <span class="prompt">lloyd@soc ~ %</span>loading report...
-    </div>
+    <div class="loading-text"><span class="prompt">lloyd@soc ~ %</span><span id="loading-msg">loading report…</span></div>
   </div>
 
   <div id="viewer-wrap"></div>
 
   <footer>
-    <span>Built by Lloyd Sato</span>
-    <span class="sep">·</span>
-    <span>2026</span>
+    <span class="foot-status">available for opportunities</span>
+    <span class="foot-right">
+      <a href="https://www.lloydsato.com" target="_blank" rel="noopener">Built by Lloyd Sato</a>
+      <span class="dim">·</span>
+      <span>2026</span>
+      <span class="dim">·</span>
+      <button class="zoom-label" id="help-btn" style="height:22px;min-width:0;padding:0 8px;font-size:11px" title="Keyboard shortcuts (?)">?</button>
+    </span>
   </footer>
+
+  <!-- Help overlay -->
+  <div id="help" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+    <div class="help-card">
+      <div class="help-head">
+        <h2><span class="num">~</span> keyboard shortcuts</h2>
+        <button class="tbtn" id="help-close" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="help-body">
+        <div class="help-row"><span>Next / previous page</span><span><kbd>J</kbd> <kbd>K</kbd></span></div>
+        <div class="help-row"><span>Scroll by page</span><span><kbd>↑</kbd> <kbd>↓</kbd></span></div>
+        <div class="help-row"><span>Find in document</span><span><kbd>/</kbd> <kbd>Ctrl+F</kbd></span></div>
+        <div class="help-row"><span>Next / prev match</span><span><kbd>↵</kbd> <kbd>⇧↵</kbd></span></div>
+        <div class="help-row"><span>Zoom in / out</span><span><kbd>+</kbd> <kbd>−</kbd></span></div>
+        <div class="help-row"><span>Fit width / reset</span><span><kbd>W</kbd> <kbd>0</kbd></span></div>
+        <div class="help-row"><span>Fit page</span><span><kbd>E</kbd></span></div>
+        <div class="help-row"><span>Jump to page</span><span><kbd>G</kbd></span></div>
+        <div class="help-row"><span>Contents / pages</span><span><kbd>T</kbd></span></div>
+        <div class="help-row"><span>Immersive mode</span><span><kbd>F</kbd></span></div>
+        <div class="help-row"><span>First / last page</span><span><kbd>Home</kbd> <kbd>End</kbd></span></div>
+        <div class="help-row"><span>This panel</span><span><kbd>?</kbd></span></div>
+      </div>
+    </div>
+  </div>
+
+  <noscript>
+    <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg-0);color:var(--fg);text-align:center;padding:24px;z-index:300">
+      This report viewer needs JavaScript. <a href="report.pdf" style="color:var(--accent)">Download the PDF</a> instead.
+    </div>
+  </noscript>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>
+  (function () {
+    "use strict";
+
     pdfjsLib.GlobalWorkerOptions.workerSrc =
       'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    const wrap       = document.getElementById('viewer-wrap');
-    const loading    = document.getElementById('loading');
-    const pageInput  = document.getElementById('page-input');
-    const totalEl    = document.getElementById('total-pages');
-    const prevBtn    = document.getElementById('prev-btn');
-    const nextBtn    = document.getElementById('next-btn');
-    const zoomSelect = document.getElementById('zoom-select');
+    /* ── elements ── */
+    const $ = id => document.getElementById(id);
+    const wrap       = $('viewer-wrap');
+    const loading    = $('loading');
+    const loadingMsg = $('loading-msg');
+    const pageInput  = $('page-input');
+    const totalEl    = $('total-pages');
+    const prevBtn    = $('prev-btn');
+    const nextBtn    = $('next-btn');
+    const zoomLabel  = $('zoom-label');
+    const progress   = $('progress');
+    const header     = document.querySelector('header');
 
+    /* ── state ── */
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+    const MAXW = 1120;
+    const PAD  = 32;                 // horizontal breathing room around a page
     let pdfDoc = null;
-    let scale  = 1;
-    const DPR  = window.devicePixelRatio || 1;
+    let zoomMode = 'width';          // 'width' | 'page'
+    let zoomFactor = 1;              // multiplier on top of the fit base
+    let renderToken = 0;
+    let firstRenderDone = false;
+    const records = [];             // records[pageNum] = { container, spans:[{el,text,lower}], text }
 
-    function maxWidth() {
-      return Math.min(window.innerWidth - 32, 960);
+    /* ============================================================
+       Rendering
+       ============================================================ */
+    function fitBaseWidth () {
+      return Math.min(wrap.clientWidth - PAD, MAXW);
     }
 
-    async function renderPage(num) {
-      const page     = await pdfDoc.getPage(num);
-      const baseVP   = page.getViewport({ scale: 1 });
-      const fitScale = (maxWidth() / baseVP.width) * scale;
-      const vp       = page.getViewport({ scale: fitScale });
+    function computeScale (base) {
+      const fitW = fitBaseWidth() / base.width;
+      if (zoomMode === 'page') {
+        const availH = wrap.clientHeight - 44;
+        return Math.min(fitW, availH / base.height) * zoomFactor;
+      }
+      return fitW * zoomFactor;
+    }
 
-      const canvas         = document.createElement('canvas');
-      canvas.className     = 'pdf-page';
-      canvas.id            = 'p' + num;
-      canvas.width         = Math.round(vp.width  * DPR);
-      canvas.height        = Math.round(vp.height * DPR);
-      canvas.style.width   = Math.round(vp.width)  + 'px';
-      canvas.style.height  = Math.round(vp.height) + 'px';
+    async function renderPage (num, token) {
+      if (!firstRenderDone) loadingMsg.textContent = 'rendering page ' + num + ' / ' + pdfDoc.numPages + '…';
+      const page = await pdfDoc.getPage(num);
+      if (token !== renderToken) return;
 
-      wrap.appendChild(canvas);
+      const base  = page.getViewport({ scale: 1 });
+      const scale = computeScale(base);
+      const vp    = page.getViewport({ scale });
+
+      const container = document.createElement('div');
+      container.className = 'page-container';
+      container.id = 'page-' + num;
+      container.style.width  = vp.width  + 'px';
+      container.style.height = vp.height + 'px';
+      container.style.scrollMarginTop = '0px';
+
+      const canvas = document.createElement('canvas');
+      canvas.className   = 'pdf-canvas';
+      canvas.width       = Math.round(vp.width  * DPR);
+      canvas.height      = Math.round(vp.height * DPR);
+      canvas.style.width  = vp.width  + 'px';
+      canvas.style.height = vp.height + 'px';
+      container.appendChild(canvas);
+      wrap.appendChild(container);
 
       const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';                       // guarantee white page bg
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.scale(DPR, DPR);
+      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      if (token !== renderToken) return;
 
-      await page.render({ canvasContext: ctx, viewport: vp, intent: 'display' }).promise;
+      const rec = { num, container, spans: [], text: '' };
+
+      /* selectable / searchable text layer */
+      let textContent = null;
+      try { textContent = await page.getTextContent(); } catch (e) { /* ignore */ }
+      if (token !== renderToken) return;
+
+      if (textContent) {
+        rec.text = textContent.items.map(i => i.str || '').join(' ');
+        const tl = document.createElement('div');
+        tl.className = 'textLayer';
+        tl.style.width  = vp.width  + 'px';
+        tl.style.height = vp.height + 'px';
+        tl.style.setProperty('--scale-factor', scale);
+        container.appendChild(tl);
+
+        let ok = true;
+        try {
+          await pdfjsLib.renderTextLayer({ textContentSource: textContent, container: tl, viewport: vp, textDivs: [] }).promise;
+        } catch (e) {
+          tl.innerHTML = '';
+          try {
+            await pdfjsLib.renderTextLayer({ textContent: textContent, container: tl, viewport: vp, textDivs: [] }).promise;
+          } catch (e2) { ok = false; tl.remove(); }
+        }
+        if (token !== renderToken) return;
+        if (ok && tl.isConnected) {
+          tl.querySelectorAll('span').forEach(s => {
+            const t = s.textContent || '';
+            if (t.trim()) rec.spans.push({ el: s, text: t, lower: t.toLowerCase() });
+          });
+        }
+      }
+
+      records[num] = rec;
     }
 
-    async function renderAll() {
+    async function renderAll (keepPage) {
+      const token = ++renderToken;
+      const target = keepPage || currentPage();
       wrap.innerHTML = '';
+      records.length = 0;
+
       for (let i = 1; i <= pdfDoc.numPages; i++) {
-        await renderPage(i);
+        if (token !== renderToken) return;
+        await renderPage(i, token);
+      }
+      if (token !== renderToken) return;
+
+      jumpToPage(target, 'auto');
+      if (find.query) runSearch(find.query, false);
+      updateProgress();
+
+      if (!firstRenderDone) {
+        firstRenderDone = true;
+        hideLoading();
+        syncNav();
+        buildOutline();
       }
     }
 
-    function jumpToPage(num) {
-      const el = document.getElementById('p' + num);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-
-    function getVisiblePage() {
-      const canvases = wrap.querySelectorAll('.pdf-page');
-      let best = 1, bestVis = 0;
-      const wrapRect = wrap.getBoundingClientRect();
-      canvases.forEach((c, i) => {
-        const r   = c.getBoundingClientRect();
-        const top = Math.max(r.top,    wrapRect.top);
-        const bot = Math.min(r.bottom, wrapRect.bottom);
-        const vis = Math.max(0, bot - top);
+    /* ============================================================
+       Page navigation
+       ============================================================ */
+    function currentPage () {
+      const pages = wrap.querySelectorAll('.page-container');
+      const wr = wrap.getBoundingClientRect();
+      let best = 1, bestVis = -1;
+      pages.forEach((p, i) => {
+        const r = p.getBoundingClientRect();
+        const vis = Math.max(0, Math.min(r.bottom, wr.bottom) - Math.max(r.top, wr.top));
         if (vis > bestVis) { bestVis = vis; best = i + 1; }
       });
       return best;
     }
 
-    wrap.addEventListener('scroll', () => {
-      const cur = getVisiblePage();
-      pageInput.value  = cur;
+    function jumpToPage (num, behavior) {
+      const el = $('page-' + num);
+      if (el) el.scrollIntoView({ behavior: behavior || 'smooth', block: 'start' });
+    }
+
+    function syncNav () {
+      const cur = currentPage();
+      if (document.activeElement !== pageInput) pageInput.value = cur;
       prevBtn.disabled = cur <= 1;
-      nextBtn.disabled = cur >= (pdfDoc ? pdfDoc.numPages : 1);
-    }, { passive: true });
+      nextBtn.disabled = !pdfDoc || cur >= pdfDoc.numPages;
+      const active = $('thumb-' + cur);
+      document.querySelectorAll('.thumb.active').forEach(t => t.classList.remove('active'));
+      if (active) active.classList.add('active');
+    }
 
-    prevBtn.addEventListener('click', () => {
-      const cur = getVisiblePage();
-      if (cur > 1) jumpToPage(cur - 1);
-    });
-    nextBtn.addEventListener('click', () => {
-      const cur = getVisiblePage();
-      if (pdfDoc && cur < pdfDoc.numPages) jumpToPage(cur + 1);
+    function updateProgress () {
+      const max = wrap.scrollHeight - wrap.clientHeight;
+      progress.style.width = (max > 0 ? (wrap.scrollTop / max) * 100 : 0) + '%';
+    }
+
+    /* auto-hide header on scroll-down */
+    let lastScroll = 0;
+    function onScroll () {
+      const y = wrap.scrollTop;
+      if (!document.body.classList.contains('immersive')) {
+        if (y > lastScroll + 6 && y > 140) header.classList.add('hidden');
+        else if (y < lastScroll - 6) header.classList.remove('hidden');
+      }
+      lastScroll = y;
+      syncNav();
+      updateProgress();
+    }
+    wrap.addEventListener('scroll', onScroll, { passive: true });
+
+    prevBtn.addEventListener('click', () => jumpToPage(Math.max(1, currentPage() - 1)));
+    nextBtn.addEventListener('click', () => jumpToPage(Math.min(pdfDoc.numPages, currentPage() + 1)));
+
+    function commitPageInput () {
+      const v = parseInt(pageInput.value, 10);
+      if (pdfDoc && v >= 1 && v <= pdfDoc.numPages) jumpToPage(v);
+      else pageInput.value = currentPage();
+    }
+    pageInput.addEventListener('keydown', e => { if (e.key === 'Enter') { commitPageInput(); pageInput.blur(); } });
+    pageInput.addEventListener('blur', commitPageInput);
+
+    /* ============================================================
+       Zoom
+       ============================================================ */
+    function setZoomLabel () {
+      zoomLabel.textContent = Math.round(zoomFactor * 100) + '%';
+      $('fit-width').classList.toggle('active', zoomMode === 'width' && zoomFactor === 1);
+      $('fit-page').classList.toggle('active', zoomMode === 'page' && zoomFactor === 1);
+    }
+    function applyZoom () { setZoomLabel(); renderAll(currentPage()); }
+
+    function stepZoom (delta) {
+      zoomFactor = Math.min(3, Math.max(0.4, Math.round((zoomFactor + delta) * 100) / 100));
+      applyZoom();
+    }
+    $('zoom-in').addEventListener('click', () => stepZoom(0.1));
+    $('zoom-out').addEventListener('click', () => stepZoom(-0.1));
+    zoomLabel.addEventListener('click', () => { zoomFactor = 1; applyZoom(); });
+    $('fit-width').addEventListener('click', () => { zoomMode = 'width'; zoomFactor = 1; applyZoom(); });
+    $('fit-page').addEventListener('click', () => { zoomMode = 'page'; zoomFactor = 1; applyZoom(); });
+
+    /* Ctrl/Cmd + wheel to zoom */
+    wrap.addEventListener('wheel', e => {
+      if (e.ctrlKey || e.metaKey) { e.preventDefault(); stepZoom(e.deltaY < 0 ? 0.1 : -0.1); }
+    }, { passive: false });
+
+    /* debounced re-fit on resize */
+    let resizeT;
+    window.addEventListener('resize', () => {
+      if (!pdfDoc) return;
+      clearTimeout(resizeT);
+      resizeT = setTimeout(() => renderAll(currentPage()), 160);
     });
 
-    pageInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter') {
-        const val = parseInt(pageInput.value);
-        if (pdfDoc && val >= 1 && val <= pdfDoc.numPages) {
-          jumpToPage(val);
-          pageInput.blur();
+    /* ============================================================
+       Find in document
+       ============================================================ */
+    const find = { query: '', matches: [], active: -1 };
+    const findbar   = $('findbar');
+    const findInput = $('find-input');
+    const findCount = $('find-count');
+
+    function esc (s) { return s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+
+    function clearHighlights () {
+      const seen = new Set();
+      find.matches.forEach(m => {
+        if (m.span && !seen.has(m.span)) { seen.add(m.span); m.span.el.textContent = m.span.text; }
+      });
+    }
+
+    function wrapAll (text, q) {
+      const lower = text.toLowerCase(), ql = q.toLowerCase();
+      let out = '', i = 0, idx;
+      while ((idx = lower.indexOf(ql, i)) !== -1) {
+        out += esc(text.slice(i, idx)) + '<mark class="hl">' + esc(text.slice(idx, idx + q.length)) + '</mark>';
+        i = idx + q.length;
+      }
+      return out + esc(text.slice(i));
+    }
+
+    function runSearch (q, autoGo) {
+      clearHighlights();
+      find.query = q; find.matches = []; find.active = -1;
+      if (!q) { findCount.textContent = '0 / 0'; return; }
+
+      const ql = q.toLowerCase();
+      for (let n = 1; n <= pdfDoc.numPages; n++) {
+        const rec = records[n]; if (!rec) continue;
+        if (rec.spans.length) {
+          rec.spans.forEach(sp => {
+            let idx = sp.lower.indexOf(ql);
+            while (idx !== -1) { find.matches.push({ page: n, span: sp }); idx = sp.lower.indexOf(ql, idx + ql.length); }
+          });
+        } else if (rec.text) {
+          const t = rec.text.toLowerCase();
+          let idx = t.indexOf(ql);
+          while (idx !== -1) { find.matches.push({ page: n, span: null }); idx = t.indexOf(ql, idx + ql.length); }
         }
       }
+
+      const spans = new Set();
+      find.matches.forEach(m => { if (m.span) spans.add(m.span); });
+      spans.forEach(sp => { sp.el.innerHTML = wrapAll(sp.text, q); });
+
+      findCount.textContent = find.matches.length ? ('0 / ' + find.matches.length) : 'no results';
+      if (autoGo && find.matches.length) gotoMatch(0);
+    }
+
+    function gotoMatch (i) {
+      if (!find.matches.length) return;
+      find.active = (i + find.matches.length) % find.matches.length;
+      const m = find.matches[find.active];
+      document.querySelectorAll('mark.hl.active').forEach(e => e.classList.remove('active'));
+
+      if (m.span) {
+        const sameSpan = find.matches.filter(x => x.span === m.span);
+        const marks = m.span.el.querySelectorAll('mark.hl');
+        const target = marks[sameSpan.indexOf(m)] || marks[0];
+        if (target) {
+          target.classList.add('active');
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else { jumpToPage(m.page); }
+      } else { jumpToPage(m.page); }
+
+      findCount.textContent = (find.active + 1) + ' / ' + find.matches.length;
+    }
+
+    function openFind () {
+      findbar.classList.add('open');
+      findInput.focus(); findInput.select();
+    }
+    function closeFind () {
+      findbar.classList.remove('open');
+      clearHighlights();
+      find.query = ''; find.matches = []; find.active = -1;
+      findInput.value = ''; findCount.textContent = '0 / 0';
+    }
+
+    let findT;
+    findInput.addEventListener('input', () => {
+      clearTimeout(findT);
+      findT = setTimeout(() => runSearch(findInput.value.trim(), true), 220);
     });
-    pageInput.addEventListener('blur', () => {
-      const val = parseInt(pageInput.value);
-      if (pdfDoc && val >= 1 && val <= pdfDoc.numPages) jumpToPage(val);
+    findInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter')  { e.preventDefault(); e.shiftKey ? gotoMatch(find.active - 1) : gotoMatch(find.active + 1); }
+      if (e.key === 'Escape') { closeFind(); }
+    });
+    $('find-next').addEventListener('click', () => gotoMatch(find.active + 1));
+    $('find-prev').addEventListener('click', () => gotoMatch(find.active - 1));
+    $('find-close').addEventListener('click', closeFind);
+    $('search-btn').addEventListener('click', () => findbar.classList.contains('open') ? closeFind() : openFind());
+
+    /* ============================================================
+       Side panel — thumbnails + outline
+       ============================================================ */
+    const panel = $('panel');
+    let thumbsBuilt = false;
+
+    function togglePanel (force) {
+      const open = force === undefined ? !panel.classList.contains('open') : force;
+      panel.classList.toggle('open', open);
+      $('panel-btn').classList.toggle('active', open);
+      if (open && !thumbsBuilt) buildThumbs();
+    }
+    $('panel-btn').addEventListener('click', () => togglePanel());
+
+    document.querySelectorAll('.panel-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const isThumbs = tab.dataset.tab === 'thumbs';
+        $('panel-thumbs').style.display  = isThumbs ? 'block' : 'none';
+        $('panel-outline').style.display = isThumbs ? 'none'  : 'block';
+      });
     });
 
-    zoomSelect.addEventListener('change', () => {
-      scale = parseFloat(zoomSelect.value);
-      renderAll();
+    async function buildThumbs () {
+      thumbsBuilt = true;
+      const host = $('thumbs');
+      for (let n = 1; n <= pdfDoc.numPages; n++) {
+        const page = await pdfDoc.getPage(n);
+        const base = page.getViewport({ scale: 1 });
+        const scale = 200 / base.width;
+        const vp = page.getViewport({ scale });
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+        const tctx = cv.getContext('2d');
+        tctx.fillStyle = '#ffffff';
+        tctx.fillRect(0, 0, cv.width, cv.height);
+        await page.render({ canvasContext: tctx, viewport: vp }).promise;
+
+        const item = document.createElement('div');
+        item.className = 'thumb'; item.id = 'thumb-' + n;
+        item.appendChild(cv);
+        const cap = document.createElement('span');
+        cap.className = 'cap'; cap.textContent = n;
+        item.appendChild(cap);
+        item.addEventListener('click', () => {
+          jumpToPage(n);
+          if (window.innerWidth < 720) togglePanel(false);
+        });
+        host.appendChild(item);
+      }
+      syncNav();
+    }
+
+    async function gotoDest (dest) {
+      try {
+        let d = dest;
+        if (typeof d === 'string') d = await pdfDoc.getDestination(d);
+        if (!Array.isArray(d)) return;
+        const idx = await pdfDoc.getPageIndex(d[0]);
+        jumpToPage(idx + 1);
+        if (window.innerWidth < 720) togglePanel(false);
+      } catch (e) { /* ignore bad dest */ }
+    }
+
+    async function buildOutline () {
+      let outline = null;
+      try { outline = await pdfDoc.getOutline(); } catch (e) { /* ignore */ }
+      if (!outline || !outline.length) {
+        $('outline').innerHTML = '<div class="panel-empty">This report has no embedded table of contents.<br>Browse it from the <b>Pages</b> tab.</div>';
+        return;
+      }
+      $('outline-tab').style.display = '';
+      const host = $('outline');
+      (function walk (items, depth) {
+        items.forEach(it => {
+          const a = document.createElement('a');
+          a.textContent = it.title || 'Untitled';
+          if (depth) a.className = 'lvl-' + Math.min(depth, 2);
+          a.addEventListener('click', () => gotoDest(it.dest));
+          host.appendChild(a);
+          if (it.items && it.items.length) walk(it.items, depth + 1);
+        });
+      })(outline, 0);
+    }
+
+    /* ============================================================
+       Immersive / fullscreen
+       ============================================================ */
+    const immersiveBtn = $('immersive-btn');
+    function setImmersive (on) {
+      document.body.classList.toggle('immersive', on);
+      immersiveBtn.classList.toggle('active', on);
+      if (on) header.classList.remove('hidden');
+      const keep = currentPage();
+      requestAnimationFrame(() => { renderAll(keep); });
+    }
+    function toggleImmersive () {
+      const goingOn = !document.body.classList.contains('immersive');
+      setImmersive(goingOn);
+      try {
+        if (goingOn && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+        else if (!goingOn && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      } catch (e) { /* fullscreen optional */ }
+    }
+    immersiveBtn.addEventListener('click', toggleImmersive);
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement && document.body.classList.contains('immersive')) setImmersive(false);
     });
 
+    /* ============================================================
+       Print + help
+       ============================================================ */
+    function printPdf () {
+      const f = document.createElement('iframe');
+      f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+      f.src = 'report.pdf';
+      f.onload = () => {
+        try { f.contentWindow.focus(); f.contentWindow.print(); }
+        catch (e) { window.open('report.pdf', '_blank', 'noopener'); }
+        setTimeout(() => f.remove(), 60000);
+      };
+      document.body.appendChild(f);
+    }
+    $('print-btn').addEventListener('click', printPdf);
+
+    const help = $('help');
+    const toggleHelp = on => help.classList.toggle('open', on === undefined ? !help.classList.contains('open') : on);
+    $('help-btn').addEventListener('click', () => toggleHelp());
+    $('help-close').addEventListener('click', () => toggleHelp(false));
+    help.addEventListener('click', e => { if (e.target === help) toggleHelp(false); });
+
+    /* ============================================================
+       Keyboard shortcuts
+       ============================================================ */
     document.addEventListener('keydown', e => {
-      if (document.activeElement === pageInput) return;
-      if (e.key === 'ArrowDown'  || e.key === 'ArrowRight') nextBtn.click();
-      if (e.key === 'ArrowUp'    || e.key === 'ArrowLeft')  prevBtn.click();
+      const typing = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') { e.preventDefault(); openFind(); return; }
+      if (typing) return;
+
+      switch (e.key) {
+        case 'ArrowDown': case 'ArrowRight': e.preventDefault(); nextBtn.click(); break;
+        case 'ArrowUp':   case 'ArrowLeft':  e.preventDefault(); prevBtn.click(); break;
+        case 'j': nextBtn.click(); break;
+        case 'k': prevBtn.click(); break;
+        case '+': case '=': e.preventDefault(); stepZoom(0.1); break;
+        case '-': case '_': e.preventDefault(); stepZoom(-0.1); break;
+        case '0': zoomFactor = 1; applyZoom(); break;
+        case 'w': zoomMode = 'width'; zoomFactor = 1; applyZoom(); break;
+        case 'e': zoomMode = 'page';  zoomFactor = 1; applyZoom(); break;
+        case 'f': toggleImmersive(); break;
+        case 't': togglePanel(); break;
+        case 'g': e.preventDefault(); pageInput.focus(); pageInput.select(); break;
+        case '/': e.preventDefault(); openFind(); break;
+        case '?': toggleHelp(); break;
+        case 'Home': e.preventDefault(); jumpToPage(1); break;
+        case 'End':  e.preventDefault(); jumpToPage(pdfDoc.numPages); break;
+        case 'Escape':
+          if (findbar.classList.contains('open')) closeFind();
+          else if (help.classList.contains('open')) toggleHelp(false);
+          else if (panel.classList.contains('open')) togglePanel(false);
+          else if (document.body.classList.contains('immersive')) toggleImmersive();
+          break;
+      }
     });
+
+    /* ============================================================
+       Boot
+       ============================================================ */
+    function hideLoading () {
+      loading.classList.add('gone');
+      setTimeout(() => { loading.style.display = 'none'; }, 420);
+    }
 
     pdfjsLib.getDocument('report.pdf').promise.then(async pdf => {
       pdfDoc = pdf;
-      totalEl.textContent  = pdf.numPages;
-      pageInput.max        = pdf.numPages;
-      loading.style.display = 'none';
-      prevBtn.disabled = true;
-      nextBtn.disabled = false;
-      await renderAll();
+      totalEl.textContent = pdf.numPages;
+      pageInput.max = pdf.numPages;
+      setZoomLabel();
+      await renderAll(1);             // renderAll hides the loader once the first pass completes
     }).catch(err => {
-      loading.innerHTML = `
-        <div style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;
-                    color:#c4713b;text-align:center;padding:20px;line-height:1.8;">
-          <span style="color:#c4713b;">lloyd@soc ~ %</span> cat report.pdf<br>
-          <span style="color:#e09060;">Could not load report.pdf</span><br>
-          <span style="color:#8a8690;font-size:0.7rem;">
-            Make sure report.pdf is in the same folder as this file.
-          </span>
-        </div>`;
       console.error(err);
+      loading.innerHTML =
+        '<div style="font-size:12.5px;color:var(--accent);text-align:center;padding:20px;line-height:1.9">' +
+          '<span style="color:var(--accent)">lloyd@soc ~ %</span> cat report.pdf<br>' +
+          '<span style="color:var(--accent-dim)">Could not load report.pdf.</span><br>' +
+          '<span style="color:var(--fg-muted);font-size:11px">Try the ' +
+          '<a href="report.pdf" download style="color:var(--accent)">direct download</a> instead.</span>' +
+        '</div>';
     });
+  })();
   </script>
 </body>
 </html>
